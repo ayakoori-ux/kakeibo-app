@@ -17,6 +17,7 @@ const client = new Anthropic();
 const ReceiptSchema = z.object({
   store: z.string().describe("店名。読み取れない場合は空文字"),
   date: z.string().describe("購入日（YYYY-MM-DD 形式）。読み取れない場合は空文字"),
+  time: z.string().describe("購入時刻（24時間制の HH:MM 形式）。読み取れない場合は空文字"),
   items: z.array(
     z.object({
       name: z.string().describe("商品名"),
@@ -29,7 +30,7 @@ const ReceiptSchema = z.object({
 
 // Claude への指示文
 const SYSTEM_PROMPT = `あなたは日本のレシートを読み取り、家計簿用のデータに変換するアシスタントです。
-画像のレシートから、店名・購入日・商品ごとの名前と金額・合計金額を読み取ってください。
+画像のレシートから、店名・購入日・購入時刻・商品ごとの名前と金額・合計金額を読み取ってください。
 
 ルール:
 - 金額は円単位の整数にする（「¥」やカンマは付けない）。
@@ -100,6 +101,10 @@ export async function readReceipt(image) {
   // 日付の形式が正しくない場合は空にして、画面側で入力してもらう
   if (!isValidDate(result.date)) {
     result.date = "";
+  }
+  // 時刻も同じく、形式が正しくなければ空にする
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(result.time)) {
+    result.time = "";
   }
   return result;
 }

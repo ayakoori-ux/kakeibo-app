@@ -2,10 +2,12 @@
 import { useState } from "react";
 import { CATEGORIES, DEFAULT_CATEGORY } from "../../shared/categories.js";
 import { createId, formatYen, today } from "../format.js";
+import { findDuplicateReceipts, findNegativeItems } from "../validation.js";
 
-export default function ReceiptReview({ receipt, onRegister, onCancel }) {
+export default function ReceiptReview({ receipt, existingEntries, onRegister, onCancel }) {
   // 日付が読み取れなかったときは今日の日付を入れておく
   const [date, setDate] = useState(receipt.date || today());
+  const [time, setTime] = useState(receipt.time ?? "");
   const [store, setStore] = useState(receipt.store);
   // 金額は入力中の文字列のまま持つ（"-" だけの入力なども扱えるように）
   const [items, setItems] = useState(() =>
@@ -29,6 +31,12 @@ export default function ReceiptReview({ receipt, onRegister, onCancel }) {
   const sum = items.reduce((total, item) => total + (Number.parseInt(item.amount, 10) || 0), 0);
   const totalMismatch = receipt.total > 0 && sum !== receipt.total;
 
+  // 検証①: 金額がマイナスの商品
+  const negativeItems = findNegativeItems(items);
+  const negativeKeys = new Set(negativeItems.map((item) => item.key));
+  // 検証②: 同じ日時・同じ合計金額のレシートがすでに登録されていないか
+  const duplicates = findDuplicateReceipts(existingEntries, { date, time, total: sum });
+
   const handleRegister = () => {
     if (!date) {
       setError("日付を入力してください。");
@@ -51,10 +59,22 @@ export default function ReceiptReview({ receipt, onRegister, onCancel }) {
       }
     }
 
+    // 重複の可能性があるときは、本当に登録するか確認する
+    if (
+      duplicates.length > 0 &&
+      !window.confirm("同じ日時・同じ合計金額のレシートがすでに登録されています。それでも登録しますか？")
+    ) {
+      return;
+    }
+
+    // 同じレシートの明細には共通の receiptId を付ける（重複チェックで使う）
+    const receiptId = createId();
     onRegister(
       items.map((item) => ({
         id: createId(),
+        receiptId,
         date,
+        time,
         store: store.trim(),
         name: item.name.trim(),
         amount: Number(item.amount),
@@ -76,6 +96,10 @@ export default function ReceiptReview({ receipt, onRegister, onCancel }) {
               <span>日付</span>
               <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required />
             </label>
+            <label className="field narrow">
+              <span>時刻</span>
+              <input type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+            </label>
             <label className="field">
               <span>店名</span>
               <input type="text" value={store} onChange={(e) => setStore(e.target.value)} />
@@ -96,7 +120,7 @@ export default function ReceiptReview({ receipt, onRegister, onCancel }) {
               </thead>
               <tbody>
                 {items.map((item, index) => (
-                  <tr key={item.key}>
+                  <tr key={item.key} className={negativeKeys.has(item.key) ? "row-warning" : undefined}>
                     <td>
                       <input
                         type="text"
@@ -156,6 +180,31 @@ export default function ReceiptReview({ receipt, onRegister, onCancel }) {
             <p className="warning" role="status">
               ⚠ 合計がレシートの金額と一致しません。読み取り漏れや金額の間違いがないか確認してください。
             </p>
+          )}
+          {negativeItems.length > 0 && (
+            <div className="warning" role="status">
+              <p>⚠ 金額がマイナスの商品があります。値引き・割引でなければ金額を確認してください。</p>
+              <ul>
+                {negativeItems.map((item) => (
+                  <li key={item.key}>
+                    {item.name || "（商品名なし）"}: {formatYen(Number.parseInt(item.amount, 10))}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {duplicates.length > 0 && (
+            <div className="warning" role="status">
+              <p>⚠ 同じ日時・同じ合計金額のレシートがすでに登録されています。二重登録に注意してください。</p>
+              <ul>
+                {duplicates.map((dup) => (
+                  <li key={dup.key}>
+                    {dup.date.replaceAll("-", "/")}
+                    {dup.time && ` ${dup.time}`} {dup.store || "（店名なし）"} 合計 {formatYen(dup.total)}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {error && (

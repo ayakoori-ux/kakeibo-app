@@ -1,10 +1,11 @@
 // 表示中の月の合計金額などを表示するコンポーネント
 import { formatYen } from "../format.js";
+import { groupReceipts } from "../validation.js";
 
 export default function MonthSummary({ entries }) {
   const total = entries.reduce((sum, entry) => sum + entry.amount, 0);
-  // 同じ日付・店名の明細は1枚のレシートとして数える
-  const receiptCount = new Set(entries.map((entry) => `${entry.date}|${entry.store}`)).size;
+  // 明細をレシート単位にまとめて枚数を数える
+  const receiptCount = groupReceipts(entries).length;
 
   return (
     <div className="summary">

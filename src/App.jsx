@@ -60,6 +60,7 @@ export default function App() {
           {pending ? (
             <ReceiptReview
               receipt={pending}
+              existingEntries={entries}
               onRegister={handleRegister}
               onCancel={() => setPending(null)}
             />
