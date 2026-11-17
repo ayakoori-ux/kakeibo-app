@@ -47,11 +47,13 @@ kakeibo-app/
 ├── CLAUDE.md
 ├── .env.example        # .env のひな形（.env 本体はコミットしない）
 ├── index.html          # Vite のエントリーポイント
-├── vite.config.js      # 開発時に /api をバックエンドへ転送
+├── vite.config.js      # 開発時に /api をバックエンドへ転送 ＋ Vitest の設定
+├── test/setup.js       # テスト共通の設定
 ├── shared/
 │   └── categories.js   # カテゴリ一覧（フロント・バックエンド共通）
 ├── server/
-│   ├── index.js        # Express サーバー（/api/receipt、本番時は dist/ も配信）
+│   ├── index.js        # サーバーの起動（listen）だけ
+│   ├── app.js          # Express アプリ本体（/api/receipt、本番時は dist/ も配信）
 │   └── receipt.js      # Claude API 呼び出し・プロンプト・出力スキーマ
 └── src/
     ├── main.jsx / App.jsx / styles.css
@@ -59,9 +61,12 @@ kakeibo-app/
     ├── image.js        # 画像の縮小・Base64 変換
     ├── storage.js      # localStorage 読み書き
     ├── format.js       # 金額・日付の表示用関数
+    ├── validation.js   # 登録前の検証（マイナス金額・重複レシート）
     ├── chartTheme.js   # グラフの色（ライト/ダーク）
     └── components/     # 画面の部品
 ```
+
+テストは対象ファイルの隣に `*.test.js` / `*.test.jsx` として置く。
 
 ## 起動・動作確認
 
@@ -71,7 +76,15 @@ kakeibo-app/
    → http://localhost:5173 を開く
 4. 本番形式: `npm run build` → `npm start` → http://localhost:3001
 
-- テスト・Lint の仕組みは現状ありません。変更後は `npm run build` が通ることと、ブラウザで読み取り・登録・グラフ・削除・リロード後の保持を確認します。
+## テスト
+
+- `npm test` … すべてのテストを1回実行（Vitest）
+- `npm run test:watch` … ファイルを保存するたびに自動で再実行
+- 変更後は `npm test` と `npm run build` が通ることを確認してからコミットする。
+- テストで本物の Claude API を呼ばない（料金がかかるため）。`server/receipt.test.js` のように SDK の `messages.parse` をモックに置き換える。
+- 画面（React コンポーネント）や localStorage のテストは、ファイル先頭に `// @vitest-environment jsdom` を書く。
+- 機能を追加・修正したら、対応するテストも追加・修正する。
+- グラフ（Chart.js）の見た目や実際の読み取り精度はテストできないので、ブラウザで確認する。
 - バックエンドが必要なため、GitHub Pages では公開できません（公開する場合は Render などの Node.js が動くサービスを使う）。
 
 ## セキュリティ
